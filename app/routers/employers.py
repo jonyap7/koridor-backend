@@ -10,6 +10,10 @@ from .. import partimer_schemas as schemas
 from .auth import get_current_user, require_role
 
 
+# Configuration constant
+DEFAULT_LEAD_PRICE = 3.0
+
+
 router = APIRouter()
 
 
@@ -272,6 +276,7 @@ def delete_job(
 @router.get("/jobs/{job_id}/matches", response_model=List[schemas.JobMatchEmployerView])
 def get_job_matches(
     job_id: int,
+    status: str = None,
     current_user: models.User = Depends(require_role(models.UserRole.EMPLOYER)),
     db: Session = Depends(get_db)
 ):
@@ -289,11 +294,22 @@ def get_job_matches(
             detail="Job not found"
         )
     
-    # Get matches
-    matches = db.query(models.JobMatch).filter(
-        models.JobMatch.job_id == job_id,
-        models.JobMatch.status == models.MatchStatus.ACCEPTED
-    ).all()
+    # Build query for matches
+    query = db.query(models.JobMatch).filter(models.JobMatch.job_id == job_id)
+    
+    # Filter by status if provided
+    if status:
+        try:
+            match_status = models.MatchStatus(status)
+            query = query.filter(models.JobMatch.status == match_status)
+        except ValueError:
+            # Show ACCEPTED matches by default if invalid status
+            query = query.filter(models.JobMatch.status == models.MatchStatus.ACCEPTED)
+    else:
+        # Show ACCEPTED matches by default
+        query = query.filter(models.JobMatch.status == models.MatchStatus.ACCEPTED)
+    
+    matches = query.all()
     
     result = []
     for match in matches:
@@ -449,10 +465,12 @@ def get_dashboard(
     ).count()
     
     # Calculate total spent
-    total_spent = db.query(models.Payment).filter(
+    payments = db.query(models.Payment).filter(
         models.Payment.employer_id == employer.id,
         models.Payment.status == models.PaymentStatus.COMPLETED
-    ).count() * 3.0  # Simplified calculation
+    ).all()
+    
+    total_spent = sum(payment.amount for payment in payments)
     
     return schemas.EmployerDashboardStats(
         active_jobs=active_jobs,

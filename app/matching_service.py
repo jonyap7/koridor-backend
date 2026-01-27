@@ -197,9 +197,15 @@ def find_matching_workers(job: models.Job, db: Session) -> List[models.Worker]:
     return matched_workers
 
 
-def create_job_matches(job: models.Job, db: Session, max_matches: int = 10) -> int:
+def create_job_matches(job: models.Job, db: Session, max_matches: int = 10, auto_commit: bool = True) -> int:
     """
     Create job matches for a job posting
+    
+    Args:
+        job: The job to create matches for
+        db: Database session
+        max_matches: Maximum number of matches to create
+        auto_commit: Whether to commit within this function (default True for backward compatibility)
     
     Returns: Number of matches created
     """
@@ -260,14 +266,19 @@ def create_job_matches(job: models.Job, db: Session, max_matches: int = 10) -> i
         job.status = models.JobStatus.MATCHING
         job.workers_matched = matches_created
     
-    db.commit()
+    if auto_commit:
+        db.commit()
     
     return matches_created
 
 
-def handle_expired_matches(db: Session) -> int:
+def handle_expired_matches(db: Session, auto_commit: bool = True) -> int:
     """
     Mark matches as expired if response deadline has passed
+    
+    Args:
+        db: Database session
+        auto_commit: Whether to commit within this function (default True)
     
     Returns: Number of matches marked as expired
     """
@@ -283,7 +294,8 @@ def handle_expired_matches(db: Session) -> int:
         match.status = models.MatchStatus.EXPIRED
         count += 1
     
-    db.commit()
+    if auto_commit:
+        db.commit()
     
     return count
 

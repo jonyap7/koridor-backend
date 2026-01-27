@@ -10,6 +10,10 @@ from .. import partimer_models as models
 from .. import partimer_schemas as schemas
 
 
+# Configuration
+TEST_OTP = "123456"  # Development only - replace with SMS service in production
+
+
 router = APIRouter()
 security = HTTPBearer()
 
@@ -214,8 +218,8 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
             )
         
         # In production, verify OTP from SMS service
-        # For now, accept any OTP (development only)
-        if payload.otp != "123456":  # Simple check for demo
+        # For now, accept configured test OTP (development only)
+        if payload.otp != TEST_OTP:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid OTP"

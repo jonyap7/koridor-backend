@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
 
 from ..db import get_db
 from .. import partimer_models as models
@@ -49,7 +50,7 @@ def update_profile(
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(worker, field, value)
     
-    worker.updated_at = models.datetime.utcnow()
+    worker.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(worker)
     
@@ -282,8 +283,18 @@ def get_dashboard(
     for match in accepted_matches:
         job = db.query(models.Job).filter(models.Job.id == match.job_id).first()
         if job:
-            # Simple estimate based on hourly rate
-            total_earnings_estimate += job.salary_amount * 8  # Assume 8 hours
+            # Calculate hours based on actual work hours
+            start_hour, start_min = map(int, job.work_hours_start.split(':'))
+            end_hour, end_min = map(int, job.work_hours_end.split(':'))
+            hours = (end_hour + end_min / 60.0) - (start_hour + start_min / 60.0)
+            
+            # Estimate based on job's salary period
+            if job.salary_period == "hourly":
+                total_earnings_estimate += job.salary_amount * hours
+            elif job.salary_period == "daily":
+                total_earnings_estimate += job.salary_amount
+            else:  # per_job
+                total_earnings_estimate += job.salary_amount
     
     return schemas.WorkerDashboardStats(
         pending_offers=pending_offers,
